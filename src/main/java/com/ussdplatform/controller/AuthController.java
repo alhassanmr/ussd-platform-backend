@@ -28,10 +28,13 @@ public class AuthController {
 
     @PostMapping("/register")
     public ResponseEntity<AuthResponse> register(@Valid @RequestBody RegisterRequest request) {
-        log.info("Register attempt for email: {}", request.getEmail());
+        log.info("━━━ REGISTER ━━━");
+        log.info("  Email      : {}", request.getEmail());
+        log.info("  Full name  : {}", request.getFullName());
+        log.info("  Company    : {}", request.getCompanyName());
 
         if (userRepository.existsByEmail(request.getEmail())) {
-            log.warn("Register failed - email already exists: {}", request.getEmail());
+            log.warn("  ✗ Email already registered: {}", request.getEmail());
             return ResponseEntity.status(HttpStatus.CONFLICT)
                     .body(new AuthResponse(null, null, "Email already registered"));
         }
@@ -44,6 +47,7 @@ public class AuthController {
         while (tenantRepository.existsBySlug(finalSlug)) {
             finalSlug = slug + "-" + (++attempt);
         }
+        log.info("  Slug       : {}", finalSlug);
 
         Tenant tenant = Tenant.builder()
                 .name(request.getCompanyName())
@@ -54,7 +58,7 @@ public class AuthController {
                 .plan(Tenant.Plan.FREE)
                 .build();
         tenantRepository.save(tenant);
-        log.info("Tenant created: {} ({})", tenant.getName(), tenant.getId());
+        log.info("  ✓ Tenant created: id={}", tenant.getId());
 
         User user = User.builder()
                 .tenant(tenant)
@@ -65,47 +69,57 @@ public class AuthController {
                 .status(User.UserStatus.ACTIVE)
                 .build();
         userRepository.save(user);
-        log.info("User created: {} ({})", user.getEmail(), user.getId());
+        log.info("  ✓ User created: id={} status={}", user.getId(), user.getStatus());
 
         String token = jwtService.generateToken(user);
+        log.info("  ✓ Token generated, returning 201");
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(new AuthResponse(token, toUserDto(user), null));
     }
 
     @PostMapping("/login")
     public ResponseEntity<AuthResponse> login(@Valid @RequestBody LoginRequest request) {
-        log.info("Login attempt for email: {}", request.getEmail());
+        log.info("━━━ LOGIN ━━━");
+        log.info("  Email: {}", request.getEmail());
+        log.info("  Password provided: {}", request.getPassword() != null && !request.getPassword().isEmpty() ? "yes (length=" + request.getPassword().length() + ")" : "NO - empty!");
 
         User user = userRepository.findByEmail(request.getEmail()).orElse(null);
 
         if (user == null) {
-            log.warn("Login failed - no user found for email: {}", request.getEmail());
+            log.warn("  ✗ No user found for email: {}", request.getEmail());
+            log.warn("  Tip: call /api/auth/register first, or check the email spelling");
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
                     .body(new AuthResponse(null, null, "Invalid credentials"));
         }
 
+        log.info("  ✓ User found: id={} status={} role={}", user.getId(), user.getStatus(), user.getRole());
+        log.info("  Stored password hash: {}...", user.getPassword().substring(0, 20));
+
         boolean passwordMatches = passwordEncoder.matches(request.getPassword(), user.getPassword());
-        log.info("Password match for {}: {}", request.getEmail(), passwordMatches);
+        log.info("  Password matches: {}", passwordMatches ? "✓ YES" : "✗ NO");
 
         if (!passwordMatches) {
-            log.warn("Login failed - wrong password for: {}", request.getEmail());
+            log.warn("  ✗ Wrong password for: {}", request.getEmail());
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
                     .body(new AuthResponse(null, null, "Invalid credentials"));
         }
 
         if (user.getStatus() != User.UserStatus.ACTIVE) {
-            log.warn("Login failed - account inactive for: {}", request.getEmail());
+            log.warn("  ✗ Account not active: {} (status={})", request.getEmail(), user.getStatus());
             return ResponseEntity.status(HttpStatus.FORBIDDEN)
                     .body(new AuthResponse(null, null, "Account is inactive"));
         }
 
         String token = jwtService.generateToken(user);
-        log.info("Login successful for: {}", request.getEmail());
+        log.info("  ✓ Login successful for: {}", request.getEmail());
+        log.info("  ✓ Token generated, returning 200");
         return ResponseEntity.ok(new AuthResponse(token, toUserDto(user), null));
     }
 
     @GetMapping("/me")
     public ResponseEntity<UserDto> me(@AuthenticationPrincipal User user) {
+        log.info("━━━ ME ━━━ user={}", user != null ? user.getEmail() : "null (not authenticated)");
+        if (user == null) return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
         return ResponseEntity.ok(toUserDto(user));
     }
 

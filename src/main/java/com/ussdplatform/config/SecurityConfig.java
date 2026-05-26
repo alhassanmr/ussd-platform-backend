@@ -32,12 +32,14 @@ import java.util.List;
 @Configuration
 @EnableWebSecurity
 @RequiredArgsConstructor
+@Slf4j
 public class SecurityConfig {
 
     private final JwtAuthFilter jwtAuthFilter;
 
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
+        log.info("SecurityFilterChain configured");
         http
             .csrf(AbstractHttpConfigurer::disable)
             .cors(cors -> cors.configurationSource(corsConfigurationSource()))
@@ -79,17 +81,30 @@ public class SecurityConfig {
         protected void doFilterInternal(HttpServletRequest request,
                                         HttpServletResponse response,
                                         FilterChain chain) throws ServletException, IOException {
+            String uri = request.getRequestURI();
             String header = request.getHeader("Authorization");
+
             if (header != null && header.startsWith("Bearer ")) {
                 String token = header.substring(7);
+                log.debug("JWT filter: token found for {}", uri);
                 if (jwtService.isValid(token)) {
                     String email = jwtService.extractEmail(token);
-                    userRepository.findByEmail(email).ifPresent(user -> {
-                        var auth = new UsernamePasswordAuthenticationToken(user, null, List.of());
-                        SecurityContextHolder.getContext().setAuthentication(auth);
-                    });
+                    log.debug("JWT filter: valid token for email={}", email);
+                    userRepository.findByEmail(email).ifPresentOrElse(
+                        user -> {
+                            var auth = new UsernamePasswordAuthenticationToken(user, null, List.of());
+                            SecurityContextHolder.getContext().setAuthentication(auth);
+                            log.debug("JWT filter: authenticated user={}", email);
+                        },
+                        () -> log.warn("JWT filter: token valid but user not found email={}", email)
+                    );
+                } else {
+                    log.warn("JWT filter: invalid/expired token for {}", uri);
                 }
+            } else {
+                log.debug("JWT filter: no token for {} (public endpoint or missing header)", uri);
             }
+
             chain.doFilter(request, response);
         }
     }
