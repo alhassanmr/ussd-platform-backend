@@ -116,28 +116,29 @@ public class UssdWebhookController {
      * Convert simple XML to flat JSON string for gateway parsing.
      * Handles flat XML like: <request><msisdn>233...</msisdn><text>1</text></request>
      */
+    /**
+     * Convert simple flat XML to JSON string for gateway parsing.
+     */
     private String xmlToJson(String xml) throws Exception {
-        javax.xml.parsers.DocumentBuilderFactory factory = javax.xml.parsers.DocumentBuilderFactory.newInstance();
+        javax.xml.parsers.DocumentBuilderFactory factory =
+                javax.xml.parsers.DocumentBuilderFactory.newInstance();
         factory.setFeature("http://apache.org/xml/features/disallow-doctype-decl", true);
         javax.xml.parsers.DocumentBuilder builder = factory.newDocumentBuilder();
-        org.w3c.dom.Document doc = builder.parse(new java.io.ByteArrayInputStream(xml.getBytes()));
+        org.w3c.dom.Document doc = builder.parse(
+                new java.io.ByteArrayInputStream(xml.getBytes(java.nio.charset.StandardCharsets.UTF_8)));
         doc.getDocumentElement().normalize();
 
         org.w3c.dom.NodeList nodes = doc.getDocumentElement().getChildNodes();
-        StringBuilder json = new StringBuilder("{");
+        com.fasterxml.jackson.databind.ObjectMapper mapper = new com.fasterxml.jackson.databind.ObjectMapper();
+        java.util.Map<String,String> map = new java.util.LinkedHashMap<>();
         for (int i = 0; i < nodes.getLength(); i++) {
             org.w3c.dom.Node node = nodes.item(i);
             if (node.getNodeType() == org.w3c.dom.Node.ELEMENT_NODE) {
-                if (json.length() > 1) json.append(",");
-                String name  = node.getNodeName();
-                String value = node.getTextContent()
-                        .replace("\\", "\\\\")
-                        .replace("\"", "\\"");
-                json.append("\"").append(name).append("\":\"").append(value).append("\"");
+                map.put(node.getNodeName(), node.getTextContent());
             }
         }
-        json.append("}");
-        log.debug("XML converted to JSON: {}", json);
-        return json.toString();
+        String result = mapper.writeValueAsString(map);
+        log.debug("XML converted to JSON: {}", result);
+        return result;
     }
 }
