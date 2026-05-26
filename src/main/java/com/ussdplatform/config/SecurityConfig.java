@@ -46,6 +46,7 @@ public class SecurityConfig {
             .sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
             .authorizeHttpRequests(auth -> auth
                 .requestMatchers("/ussd/webhook/**").permitAll()
+                .requestMatchers("/actuator/health", "/actuator/info").permitAll()
                 .requestMatchers("/api/auth/register", "/api/auth/login", "/api/auth/verify", "/api/auth/verify-otp", "/api/auth/resend-verification", "/api/auth/forgot-password", "/api/auth/reset-password").permitAll()
                 .requestMatchers("/api/admin/login", "/api/admin/setup").permitAll()
                 .requestMatchers("/api/team/invite/validate", "/api/team/invite/accept").permitAll()
