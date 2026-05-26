@@ -76,6 +76,17 @@ public class EmailVerificationService {
     }
 
     /**
+     * Validate token without consuming it.
+     * Safe to call multiple times — used by GET endpoint.
+     */
+    public void validateTokenOnly(String token) {
+        EmailVerificationToken verificationToken = tokenRepo.findByToken(token)
+                .orElseThrow(() -> new IllegalArgumentException("Invalid verification link. Please request a new one."));
+        if (verificationToken.isUsed())    throw new IllegalArgumentException("This verification link has already been used. Please log in.");
+        if (verificationToken.isExpired()) throw new IllegalArgumentException("This verification link has expired (24h). Please register again or request a new link.");
+    }
+
+    /**
      * Verify token and activate the user account.
      * Returns the user if successful, throws if invalid/expired.
      */
