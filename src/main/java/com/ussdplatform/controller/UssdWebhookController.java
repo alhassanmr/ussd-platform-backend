@@ -129,8 +129,11 @@ public class UssdWebhookController {
             org.w3c.dom.Node node = nodes.item(i);
             if (node.getNodeType() == org.w3c.dom.Node.ELEMENT_NODE) {
                 if (json.length() > 1) json.append(",");
-                json.append("\"").append(node.getNodeName()).append("\":\"")
-                    .append(node.getTextContent().replace(""", "\\"")).append("\"");
+                String name  = node.getNodeName();
+                String value = node.getTextContent()
+                        .replace("\\", "\\\\")
+                        .replace("\"", "\\"");
+                json.append("\"").append(name).append("\":\"").append(value).append("\"");
             }
         }
         json.append("}");
