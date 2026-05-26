@@ -49,7 +49,7 @@ public class SecurityConfig {
                 .requestMatchers("/api/auth/register", "/api/auth/login", "/api/auth/verify", "/api/auth/verify-otp", "/api/auth/resend-verification", "/api/auth/forgot-password", "/api/auth/reset-password").permitAll()
                 .requestMatchers("/api/admin/login", "/api/admin/setup").permitAll()
                 .requestMatchers("/api/team/invite/validate", "/api/team/invite/accept").permitAll()
-                .requestMatchers("/api/billing/paystack/webhook").permitAll()
+                .requestMatchers("/api/billing/paystack/webhook", "/api/billing/verify").permitAll()
                 .anyRequest().authenticated()
             )
             .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class);

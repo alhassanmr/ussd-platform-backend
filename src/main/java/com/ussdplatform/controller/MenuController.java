@@ -3,6 +3,7 @@ package com.ussdplatform.controller;
 import com.ussdplatform.dto.*;
 import com.ussdplatform.model.*;
 import com.ussdplatform.repository.*;
+import com.ussdplatform.config.RolePermissions;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -44,6 +45,7 @@ public class MenuController {
             @PathVariable UUID appId,
             @Valid @RequestBody CreateMenuRequest request) {
 
+        if (!RolePermissions.canEditMenus(user)) return ResponseEntity.status(403).build();
         UssdApp app = appRepository.findByIdAndTenantId(appId, user.getTenant().getId())
                 .orElse(null);
         if (app == null) return ResponseEntity.notFound().build();
@@ -109,6 +111,7 @@ public class MenuController {
             @PathVariable UUID menuId,
             @Valid @RequestBody CreateMenuItemRequest request) {
 
+        if (!RolePermissions.canEditMenus(user)) return ResponseEntity.status(403).build();
         if (!appRepository.existsByIdAndTenantId(appId, user.getTenant().getId())) {
             return ResponseEntity.notFound().build();
         }
