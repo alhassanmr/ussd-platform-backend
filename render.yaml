@@ -1,0 +1,61 @@
+services:
+  # Spring Boot Backend
+  - type: web
+    name: ussd-platform-api
+    runtime: docker
+    dockerfilePath: ./backend/Dockerfile
+    envVars:
+      - key: DB_USERNAME
+        fromDatabase:
+          name: ussd-db
+          property: user
+      - key: DB_PASSWORD
+        fromDatabase:
+          name: ussd-db
+          property: password
+      - key: SPRING_DATASOURCE_URL
+        fromDatabase:
+          name: ussd-db
+          property: connectionString
+      - key: REDIS_HOST
+        fromService:
+          name: ussd-redis
+          type: redis
+          property: host
+      - key: REDIS_PORT
+        fromService:
+          name: ussd-redis
+          type: redis
+          property: port
+      - key: JWT_SECRET
+        sync: false   # set manually in Render dashboard
+      - key: PAYSTACK_SECRET_KEY
+        sync: false
+      - key: MAIL_USERNAME
+        sync: false
+      - key: MAIL_PASSWORD
+        sync: false
+      - key: ADMIN_SETUP_SECRET
+        sync: false
+
+  # React Frontend
+  - type: web
+    name: ussd-platform-frontend
+    runtime: docker
+    dockerfilePath: ./frontend/Dockerfile
+    envVars:
+      - key: VITE_API_URL
+        fromService:
+          name: ussd-platform-api
+          type: web
+          property: url
+
+databases:
+  - name: ussd-db
+    databaseName: ussd_platform
+    user: ussd_user
+    plan: free
+
+  - name: ussd-redis
+    type: redis
+    plan: free

@@ -1,0 +1,82 @@
+spring:
+  application:
+    name: ussd-as-a-service
+
+  datasource:
+    url: jdbc:postgresql://localhost:5432/ussd_platform
+    username: ${DB_USERNAME:postgres}
+    password: ${DB_PASSWORD:postgres}
+    driver-class-name: org.postgresql.Driver
+
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    show-sql: false
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+        format_sql: true
+
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+      password: ${REDIS_PASSWORD:}
+
+  jackson:
+    serialization:
+      write-dates-as-timestamps: false
+
+server:
+  port: 8080
+
+jwt:
+  secret: ${JWT_SECRET:your-256-bit-secret-change-in-production-please}
+  expiration: 86400000  # 24 hours
+
+ussd:
+  session:
+    timeout: 120  # seconds — USSD sessions expire after 2 mins of inactivity
+  gateways:
+    africastalking:
+      api-key: ${AT_API_KEY:}
+      username: ${AT_USERNAME:}
+      base-url: https://api.africastalking.com/version1
+    hubtel:
+      client-id: ${HUBTEL_CLIENT_ID:}
+      client-secret: ${HUBTEL_CLIENT_SECRET:}
+      base-url: https://api.hubtel.com/v1/ussd
+
+logging:
+  level:
+    com.ussdplatform: DEBUG
+    org.springframework.security: WARN
+
+paystack:
+  secret-key: ${PAYSTACK_SECRET_KEY:sk_test_placeholder}
+  public-key: ${PAYSTACK_PUBLIC_KEY:pk_test_placeholder}
+
+app:
+  base-url: ${APP_BASE_URL:http://localhost:3000}
+  name: USSD Platform
+
+spring:
+  mail:
+    host: ${MAIL_HOST:smtp.gmail.com}
+    port: ${MAIL_PORT:587}
+    username: ${MAIL_USERNAME:}
+    password: ${MAIL_PASSWORD:}
+    from: ${MAIL_FROM:noreply@ussdplatform.com}
+    properties:
+      mail:
+        smtp:
+          auth: true
+          starttls:
+            enable: true
+
+admin:
+  setup-secret: ${ADMIN_SETUP_SECRET:CHANGE_ME_BEFORE_DEPLOY}
