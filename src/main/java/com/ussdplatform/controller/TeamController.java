@@ -149,34 +149,38 @@ public class TeamController {
     // ─── Update member role ───────────────────────────────────────────────────
 
     @PutMapping("/members/{id}/role")
-    public ResponseEntity<Map<String, Object>> updateRole(
+    public ResponseEntity<?> updateRole(
             @AuthenticationPrincipal User currentUser,
             @PathVariable UUID id,
             @RequestBody Map<String, String> req) {
 
         if (!RolePermissions.canManageRoles(currentUser)) {
-            return ResponseEntity.status(HttpStatus.FORBIDDEN)
-                    .body(Map.of("error", "Only owners can change roles"));
+            Map<String, Object> err = new LinkedHashMap<>();
+            err.put("error", "Only owners can change roles");
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(err);
         }
 
-        return userRepo.findById(id)
-                .filter(u -> u.getTenant().getId().equals(currentUser.getTenant().getId()))
-                .map(u -> {
-                    if (u.getId().equals(currentUser.getId())) {
-                        return ResponseEntity.badRequest()
-                                .<Map<String, Object>>body(Map.of("error", "You cannot change your own role"));
-                    }
-                    try {
-                        u.setRole(User.Role.valueOf(req.get("role").toUpperCase()));
-                        userRepo.save(u);
-                        return ResponseEntity.ok(Map.of(
-                                "id", u.getId(), "role", u.getRole().name()));
-                    } catch (Exception e) {
-                        return ResponseEntity.badRequest()
-                                .<Map<String, Object>>body(Map.of("error", "Invalid role"));
-                    }
-                })
-                .orElse(ResponseEntity.notFound().build());
+        User target = userRepo.findById(id).orElse(null);
+        if (target == null || !target.getTenant().getId().equals(currentUser.getTenant().getId())) {
+            return ResponseEntity.notFound().build();
+        }
+        if (target.getId().equals(currentUser.getId())) {
+            Map<String, Object> err = new LinkedHashMap<>();
+            err.put("error", "You cannot change your own role");
+            return ResponseEntity.badRequest().body(err);
+        }
+        try {
+            target.setRole(User.Role.valueOf(req.get("role").toUpperCase()));
+            userRepo.save(target);
+            Map<String, Object> ok = new LinkedHashMap<>();
+            ok.put("id", target.getId());
+            ok.put("role", target.getRole().name());
+            return ResponseEntity.ok(ok);
+        } catch (Exception e) {
+            Map<String, Object> err = new LinkedHashMap<>();
+            err.put("error", "Invalid role");
+            return ResponseEntity.badRequest().body(err);
+        }
     }
 
     // ─── Remove member ────────────────────────────────────────────────────────
