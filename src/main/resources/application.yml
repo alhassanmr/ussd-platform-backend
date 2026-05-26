@@ -66,6 +66,15 @@ ussd:
       client-id: ${HUBTEL_CLIENT_ID:}
       client-secret: ${HUBTEL_CLIENT_SECRET:}
       base-url: https://api.hubtel.com/v1/ussd
+    wigal:
+      api-key: ${WIGAL_API_KEY:}
+      base-url: https://apps.wigal.com.gh/ussd
+    arkesel:
+      api-key: ${ARKESEL_API_KEY:}
+      base-url: https://sms.arkesel.com/ussd/v1
+    rancard:
+      api-key: ${RANCARD_API_KEY:}
+      base-url: https://ussd.rancard.com/api
 
 mailjet:
   api-key-public: ${MAILJET_API_KEY_PUBLIC:9014a70c148a2a8e6fe74ee3d44d2cb7}

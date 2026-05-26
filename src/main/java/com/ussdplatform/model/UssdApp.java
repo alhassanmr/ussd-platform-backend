@@ -54,6 +54,6 @@ public class UssdApp {
     @PreUpdate
     void onUpdate() { this.updatedAt = LocalDateTime.now(); }
 
-    public enum GatewayType { AFRICASTALKING, HUBTEL, CUSTOM }
+    public enum GatewayType { AFRICASTALKING, HUBTEL, WIGAL, ARKESEL, RANCARD, CUSTOM }
     public enum AppStatus { DRAFT, ACTIVE, PAUSED }
 }
