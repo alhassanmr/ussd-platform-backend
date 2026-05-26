@@ -94,7 +94,7 @@ public class SecurityConfig {
                     log.debug("JWT filter: valid token for email={}", email);
                     userRepository.findByEmail(email).ifPresentOrElse(
                         user -> {
-                            var auth = new UsernamePasswordAuthenticationToken(user, null, List.of());
+                            var auth = new UsernamePasswordAuthenticationToken(user, null, List.of(new org.springframework.security.core.authority.SimpleGrantedAuthority("ROLE_" + user.getRole().name())));
                             SecurityContextHolder.getContext().setAuthentication(auth);
                             log.debug("JWT filter: authenticated user={}", email);
                         },
