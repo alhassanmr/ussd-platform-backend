@@ -36,13 +36,17 @@ spring:
     port: ${MAIL_PORT:587}
     username: ${MAIL_USERNAME:}
     password: ${MAIL_PASSWORD:}
-    from: ${MAIL_FROM:noreply@ussdplatform.com}
+    from: ${MAIL_FROM:${MAIL_USERNAME:noreply@ussdplatform.com}}
     properties:
       mail:
         smtp:
           auth: true
           starttls:
             enable: true
+            required: true
+          connectiontimeout: 5000
+          timeout: 5000
+          writetimeout: 5000
 
 server:
   port: 8080

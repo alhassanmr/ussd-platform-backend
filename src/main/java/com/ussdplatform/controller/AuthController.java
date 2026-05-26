@@ -5,6 +5,7 @@ import com.ussdplatform.model.Tenant;
 import com.ussdplatform.model.User;
 import com.ussdplatform.repository.TenantRepository;
 import com.ussdplatform.repository.UserRepository;
+import com.ussdplatform.notification.NotificationService;
 import com.ussdplatform.security.JwtService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -25,6 +26,7 @@ public class AuthController {
     private final TenantRepository tenantRepository;
     private final PasswordEncoder passwordEncoder;
     private final JwtService jwtService;
+    private final NotificationService notificationService;
 
     @PostMapping("/register")
     public ResponseEntity<AuthResponse> register(@Valid @RequestBody RegisterRequest request) {
@@ -72,6 +74,9 @@ public class AuthController {
         log.info("  ✓ User created: id={} status={}", user.getId(), user.getStatus());
 
         String token = jwtService.generateToken(user);
+        // Send welcome email (async - won't block response)
+        notificationService.sendWelcome(tenant, request.getFullName());
+        log.info("  ✓ Welcome email queued for: {}", request.getEmail());
         log.info("  ✓ Token generated, returning 201");
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(new AuthResponse(token, toUserDto(user), null));
