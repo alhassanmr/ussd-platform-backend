@@ -1,6 +1,7 @@
 package com.ussdplatform.controller;
 
 import com.ussdplatform.billing.UsageTrackingService;
+import com.ussdplatform.gateway.impl.ConfigurableGateway;
 import com.ussdplatform.engine.UssdEngine;
 import com.ussdplatform.gateway.GatewayFactory;
 import com.ussdplatform.gateway.UssdGateway;
@@ -34,6 +35,7 @@ public class UssdWebhookController {
     private final GatewayFactory gatewayFactory;
     private final UssdAppRepository appRepository;
     private final UsageTrackingService usageTrackingService;
+    private final ConfigurableGateway configurableGateway;
 
     /**
      * Africa's Talking sends form-encoded POST.
@@ -63,7 +65,13 @@ public class UssdWebhookController {
         UssdRequest request;
 
         try {
-            request = gateway.parseRequest(rawBody);
+            // For CUSTOM/CONFIGURABLE apps use field mapping from app config
+            if (app.getGatewayType() == com.ussdplatform.model.UssdApp.GatewayType.CUSTOM
+                    || app.getGatewayType() == com.ussdplatform.model.UssdApp.GatewayType.CONFIGURABLE) {
+                request = configurableGateway.parseRequest(rawBody, app);
+            } else {
+                request = gateway.parseRequest(rawBody);
+            }
         } catch (Exception e) {
             log.error("Failed to parse gateway request for app {}", appId, e);
             return ResponseEntity.ok(gateway.formatResponse(
@@ -76,7 +84,13 @@ public class UssdWebhookController {
         UssdResponse response = engine.process(app, request);
         // Track usage asynchronously
         try { usageTrackingService.recordSession(app.getTenant(), app); } catch (Exception e) { log.warn("Usage tracking failed: {}", e.getMessage()); }
-        String formatted = gateway.formatResponse(response);
+        String formatted;
+        if (app.getGatewayType() == com.ussdplatform.model.UssdApp.GatewayType.CUSTOM
+                || app.getGatewayType() == com.ussdplatform.model.UssdApp.GatewayType.CONFIGURABLE) {
+            formatted = configurableGateway.formatResponse(response, app);
+        } else {
+            formatted = gateway.formatResponse(response);
+        }
         log.debug("USSD response for session {}: {}", request.getSessionId(), formatted);
 
         return ResponseEntity.ok(formatted);
