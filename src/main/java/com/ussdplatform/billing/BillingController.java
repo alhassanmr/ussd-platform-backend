@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.ussdplatform.model.*;
 import com.ussdplatform.repository.*;
+import com.ussdplatform.config.RolePermissions;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -55,6 +56,9 @@ public class BillingController {
 
     @GetMapping("/subscription")
     public ResponseEntity<Map<String, Object>> getSubscription(@AuthenticationPrincipal User user) {
+        if (!RolePermissions.canAccessBilling(user)) {
+            return ResponseEntity.status(403).build();
+        }
         Map<String, Object> result = new LinkedHashMap<>();
         subscriptionRepo.findByTenantId(user.getTenant().getId()).ifPresentOrElse(
             sub -> {
@@ -96,6 +100,9 @@ public class BillingController {
     public ResponseEntity<Map<String, Object>> subscribe(
             @AuthenticationPrincipal User user,
             @PathVariable String planName) {
+        if (!RolePermissions.canAccessBilling(user)) {
+            return ResponseEntity.status(403).build();
+        }
         Plan plan = planRepo.findByName(planName.toUpperCase()).orElse(null);
         if (plan == null) {
             Map<String, Object> err = new LinkedHashMap<>();

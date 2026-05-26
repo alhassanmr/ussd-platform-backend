@@ -3,6 +3,7 @@ package com.ussdplatform.controller;
 import com.ussdplatform.dto.*;
 import com.ussdplatform.model.*;
 import com.ussdplatform.repository.*;
+import com.ussdplatform.config.RolePermissions;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -34,6 +35,9 @@ public class UssdAppController {
     public ResponseEntity<AppDto> createApp(
             @AuthenticationPrincipal User user,
             @Valid @RequestBody CreateAppRequest request) {
+        if (!RolePermissions.canCreateApp(user)) {
+            return ResponseEntity.status(403).build();
+        }
 
         UssdApp app = UssdApp.builder()
                 .tenant(user.getTenant())
@@ -73,6 +77,9 @@ public class UssdAppController {
             @AuthenticationPrincipal User user,
             @PathVariable UUID id,
             @Valid @RequestBody UpdateAppRequest request) {
+        if (!RolePermissions.canEditApp(user)) {
+            return ResponseEntity.status(403).build();
+        }
 
         return appRepository.findByIdAndTenantId(id, user.getTenant().getId())
                 .map(app -> {
@@ -90,6 +97,9 @@ public class UssdAppController {
     public ResponseEntity<?> deleteApp(
             @AuthenticationPrincipal User user,
             @PathVariable UUID id) {
+        if (!RolePermissions.canDeleteApp(user)) {
+            return ResponseEntity.status(403).build();
+        }
 
         return appRepository.findByIdAndTenantId(id, user.getTenant().getId())
                 .map(app -> {

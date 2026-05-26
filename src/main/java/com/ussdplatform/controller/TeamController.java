@@ -1,5 +1,6 @@
 package com.ussdplatform.controller;
 
+import com.ussdplatform.config.RolePermissions;
 import com.ussdplatform.model.*;
 import com.ussdplatform.notification.TeamInviteService;
 import com.ussdplatform.repository.*;
@@ -75,7 +76,7 @@ public class TeamController {
             @RequestBody Map<String, String> req) {
 
         // Only OWNER and ADMIN can invite
-        if (currentUser.getRole() == User.Role.MEMBER) {
+        if (!RolePermissions.canInviteMembers(currentUser)) {
             return ResponseEntity.status(HttpStatus.FORBIDDEN)
                     .body(Map.of("error", "Only owners and admins can invite team members"));
         }
@@ -132,7 +133,7 @@ public class TeamController {
             @AuthenticationPrincipal User currentUser,
             @PathVariable UUID id) {
 
-        if (currentUser.getRole() == User.Role.MEMBER) {
+        if (!RolePermissions.canInviteMembers(currentUser)) {
             return ResponseEntity.status(HttpStatus.FORBIDDEN)
                     .body(Map.of("error", "Insufficient permissions"));
         }
@@ -153,7 +154,7 @@ public class TeamController {
             @PathVariable UUID id,
             @RequestBody Map<String, String> req) {
 
-        if (currentUser.getRole() != User.Role.OWNER) {
+        if (!RolePermissions.canManageRoles(currentUser)) {
             return ResponseEntity.status(HttpStatus.FORBIDDEN)
                     .body(Map.of("error", "Only owners can change roles"));
         }
@@ -185,7 +186,7 @@ public class TeamController {
             @AuthenticationPrincipal User currentUser,
             @PathVariable UUID id) {
 
-        if (currentUser.getRole() != User.Role.OWNER) {
+        if (!RolePermissions.canRemoveMembers(currentUser)) {
             return ResponseEntity.status(HttpStatus.FORBIDDEN)
                     .body(Map.of("error", "Only owners can remove members"));
         }

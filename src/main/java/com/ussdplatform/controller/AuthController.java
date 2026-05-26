@@ -80,14 +80,28 @@ public class AuthController {
 
     @PostMapping("/login")
     public ResponseEntity<Map<String, Object>> login(@Valid @RequestBody LoginRequest request) {
-        log.info("━━━ LOGIN STEP 1 ━━━ email={}", request.getEmail());
+        String identifier = request.getEmail();
+        log.info("━━━ LOGIN STEP 1 ━━━ identifier={}", identifier);
 
-        User user = userRepository.findByEmail(request.getEmail()).orElse(null);
+        // Accept email OR phone number
+        User user = null;
+        if (identifier != null && identifier.startsWith("+")) {
+            // Looks like a phone number
+            user = userRepository.findByPhone(identifier).orElse(null);
+            log.info("  Phone login attempt for: {}", identifier);
+        } else {
+            // Try email first
+            user = userRepository.findByEmail(identifier).orElse(null);
+            if (user == null && identifier != null && identifier.matches("\\d+")) {
+                // Pure digits — try as phone with no country code (last resort)
+                log.info("  Trying numeric identifier as phone: {}", identifier);
+            }
+        }
 
         if (user == null || !passwordEncoder.matches(request.getPassword(), user.getPassword())) {
-            log.warn("  ✗ Invalid credentials for: {}", request.getEmail());
+            log.warn("  ✗ Invalid credentials for: {}", identifier);
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
-                    .body(Map.of("error", "Invalid email or password"));
+                    .body(Map.of("error", "Invalid email/phone or password"));
         }
 
         if (user.getStatus() == User.UserStatus.PENDING) {
