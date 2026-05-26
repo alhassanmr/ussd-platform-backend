@@ -8,5 +8,6 @@ public class UpdateAppRequest {
     public String shortCode;
     public String status;
     public String gatewayType;
+    public String webhookMethod;
     public Map<String, String> gatewayConfig;
 }

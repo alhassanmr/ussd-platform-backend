@@ -92,6 +92,9 @@ public class UssdAppController {
                         try { app.setGatewayType(UssdApp.GatewayType.valueOf(request.getGatewayType())); }
                         catch (IllegalArgumentException e) { /* ignore invalid gateway type */ }
                     }
+                    if (request.getWebhookMethod() != null && (request.getWebhookMethod().equalsIgnoreCase("POST") || request.getWebhookMethod().equalsIgnoreCase("GET"))) {
+                        app.setWebhookMethod(request.getWebhookMethod().toUpperCase());
+                    }
                     return ResponseEntity.ok(toDto(appRepository.save(app)));
                 })
                 .orElse(ResponseEntity.notFound().build());
