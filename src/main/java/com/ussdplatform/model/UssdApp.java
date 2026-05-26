@@ -34,6 +34,14 @@ public class UssdApp {
     @Column(name = "gateway_type", nullable = false)
     private GatewayType gatewayType;
 
+    @Column(name = "webhook_method", length = 10)
+    @Builder.Default
+    private String webhookMethod = "POST";
+
+    @Column(name = "request_format", length = 10)
+    @Builder.Default
+    private String requestFormat = "JSON";
+
     @Column(name = "gateway_config", columnDefinition = "jsonb")
     @JdbcTypeCode(SqlTypes.JSON)
     private Map<String, String> gatewayConfig;
