@@ -185,33 +185,14 @@ public class AuthController {
     // ─── Email Verification ───────────────────────────────────────────────────
 
     /**
-     * GET /verify?token= — validate token only (don't consume it yet).
-     * Called when user lands on the verify page.
-     * Email clients pre-fetch links — we must NOT verify on GET.
+     * GET /verify?token= — verify email and activate account.
+     * One click from email is all that's needed.
+     * If email pre-fetcher hits this first, the 60s grace period in
+     * EmailVerificationService ensures the real click still works.
      */
     @GetMapping("/verify")
-    public ResponseEntity<Map<String, String>> validateEmailToken(@RequestParam String token) {
-        log.info("━━━ VALIDATE EMAIL TOKEN ━━━");
-        try {
-            // Just check if token is valid — don't mark as used yet
-            emailVerificationService.validateTokenOnly(token);
-            return ResponseEntity.ok(Map.of(
-                    "valid", "true",
-                    "message", "Token is valid. Click the button to verify your email."
-            ));
-        } catch (IllegalArgumentException e) {
-            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
-        }
-    }
-
-    /**
-     * POST /verify — actually verify and activate account.
-     * Called when user clicks the "Activate account" button on the verify page.
-     * This is safe from email pre-fetching (pre-fetchers only do GET).
-     */
-    @PostMapping("/verify")
     public ResponseEntity<Map<String, String>> verifyEmail(@RequestParam String token) {
-        log.info("━━━ VERIFY EMAIL (POST) ━━━");
+        log.info("━━━ VERIFY EMAIL ━━━");
         try {
             User user = emailVerificationService.verifyToken(token);
             notificationService.sendWelcome(user.getTenant(), user.getFullName());

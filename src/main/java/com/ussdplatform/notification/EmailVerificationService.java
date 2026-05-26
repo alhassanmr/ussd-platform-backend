@@ -96,6 +96,14 @@ public class EmailVerificationService {
                 .orElseThrow(() -> new IllegalArgumentException("Invalid verification link. Please request a new one."));
 
         if (verificationToken.isUsed()) {
+            // If used very recently (within 60s), it was likely the email pre-fetcher.
+            // Return the user anyway so the real click still works.
+            boolean usedJustNow = verificationToken.getUsedAt() != null &&
+                verificationToken.getUsedAt().isAfter(LocalDateTime.now().minusSeconds(60));
+            if (usedJustNow) {
+                log.info("Token used within 60s — likely email pre-fetch, returning user anyway");
+                return verificationToken.getUser();
+            }
             throw new IllegalArgumentException("This verification link has already been used. Please log in.");
         }
 
