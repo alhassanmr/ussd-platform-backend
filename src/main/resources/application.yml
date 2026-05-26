@@ -70,7 +70,7 @@ ussd:
 mailjet:
   api-key-public: ${MAILJET_API_KEY_PUBLIC:9014a70c148a2a8e6fe74ee3d44d2cb7}
   api-key-private: ${MAILJET_API_KEY_PRIVATE:efc3794a5455b9d133fe86f3aa076f34}
-  from-email: ${MAILJET_FROM_EMAIL:hasfatempire@gmail.com}
+  from-email: ${MAILJET_FROM_EMAIL:alhassanmr@gmail.com}
   from-name: ${MAILJET_FROM_NAME:Hasfatempire}
 
 paystack:
