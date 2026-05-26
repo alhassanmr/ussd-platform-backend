@@ -174,6 +174,26 @@ public class MenuController {
                 .orElse(ResponseEntity.notFound().build());
     }
 
+    @DeleteMapping("/{menuId}")
+    public ResponseEntity<Void> deleteMenu(
+            @AuthenticationPrincipal User user,
+            @PathVariable UUID appId,
+            @PathVariable UUID menuId) {
+
+        if (!appRepository.existsByIdAndTenantId(appId, user.getTenant().getId()))
+            return ResponseEntity.notFound().build();
+
+        menuRepository.findById(menuId).ifPresent(menu -> {
+            if (menu.isRoot()) {
+                // Don't delete root if other menus exist
+                long count = menuRepository.countByAppId(appId);
+                if (count > 1) return;
+            }
+            menuRepository.delete(menu);
+        });
+        return ResponseEntity.noContent().build();
+    }
+
     @DeleteMapping("/{menuId}/items/{itemId}")
     public ResponseEntity<Void> deleteItem(
             @AuthenticationPrincipal User user,

@@ -14,4 +14,5 @@ public interface MenuRepository extends JpaRepository<Menu, UUID> {
     @Modifying @Transactional
     @Query("UPDATE Menu m SET m.isRoot = false WHERE m.app.id = :appId")
     void clearRootForApp(UUID appId);
+    long countByAppId(UUID appId);
 }
