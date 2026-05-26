@@ -5,6 +5,7 @@ import com.ussdplatform.model.Tenant;
 import com.ussdplatform.model.User;
 import com.ussdplatform.notification.EmailVerificationService;
 import com.ussdplatform.notification.NotificationService;
+import com.ussdplatform.notification.OtpService;
 import com.ussdplatform.repository.TenantRepository;
 import com.ussdplatform.repository.UserRepository;
 import com.ussdplatform.security.JwtService;
@@ -31,21 +32,21 @@ public class AuthController {
     private final JwtService jwtService;
     private final NotificationService notificationService;
     private final EmailVerificationService emailVerificationService;
+    private final OtpService otpService;
+
+    // ─── Step 1: Register ─────────────────────────────────────────────────────
 
     @PostMapping("/register")
     public ResponseEntity<AuthResponse> register(@Valid @RequestBody RegisterRequest request) {
         log.info("━━━ REGISTER ━━━ email={}", request.getEmail());
 
         if (userRepository.existsByEmail(request.getEmail())) {
-            log.warn("  ✗ Email already registered: {}", request.getEmail());
             return ResponseEntity.status(HttpStatus.CONFLICT)
                     .body(new AuthResponse(null, null, "Email already registered"));
         }
 
-        // Create tenant
         String slug = request.getCompanyName().toLowerCase()
-                .replaceAll("[^a-z0-9]", "-")
-                .replaceAll("-+", "-");
+                .replaceAll("[^a-z0-9]", "-").replaceAll("-+", "-");
         String finalSlug = slug;
         int attempt = 0;
         while (tenantRepository.existsBySlug(finalSlug)) {
@@ -53,103 +54,121 @@ public class AuthController {
         }
 
         Tenant tenant = Tenant.builder()
-                .name(request.getCompanyName())
-                .slug(finalSlug)
-                .email(request.getEmail())
-                .phone(request.getPhone())
-                .status(Tenant.TenantStatus.TRIAL)
-                .plan(Tenant.Plan.FREE)
+                .name(request.getCompanyName()).slug(finalSlug)
+                .email(request.getEmail()).phone(request.getPhone())
+                .status(Tenant.TenantStatus.TRIAL).plan(Tenant.Plan.FREE)
                 .build();
         tenantRepository.save(tenant);
-        log.info("  ✓ Tenant created: {} ({})", tenant.getName(), tenant.getId());
 
-        // Create user with PENDING status — must verify email first
         User user = User.builder()
-                .tenant(tenant)
-                .email(request.getEmail())
+                .tenant(tenant).email(request.getEmail())
                 .password(passwordEncoder.encode(request.getPassword()))
                 .fullName(request.getFullName())
                 .role(User.Role.OWNER)
-                .status(User.UserStatus.PENDING)
+                .status(User.UserStatus.PENDING)  // must verify email
                 .build();
         userRepository.save(user);
-        log.info("  ✓ User created: {} (status=PENDING)", user.getId());
 
-        // Send verification email (async)
         emailVerificationService.sendVerificationEmail(user);
-        log.info("  ✓ Verification email queued for: {}", request.getEmail());
+        log.info("  ✓ Registered {} — verification email sent", request.getEmail());
 
-        // Return 201 but no token — user must verify first
-        return ResponseEntity.status(HttpStatus.CREATED)
-                .body(new AuthResponse(null, null,
-                        "Account created! Please check your email (" + request.getEmail() + ") and click the verification link to activate your account."));
+        return ResponseEntity.status(HttpStatus.CREATED).body(new AuthResponse(null, null,
+                "Account created! Please check your email and click the verification link to activate your account."));
     }
 
+    // ─── Step 2a: Login (password check → send OTP) ───────────────────────────
+
     @PostMapping("/login")
-    public ResponseEntity<AuthResponse> login(@Valid @RequestBody LoginRequest request) {
-        log.info("━━━ LOGIN ━━━ email={}", request.getEmail());
+    public ResponseEntity<Map<String, Object>> login(@Valid @RequestBody LoginRequest request) {
+        log.info("━━━ LOGIN STEP 1 ━━━ email={}", request.getEmail());
 
         User user = userRepository.findByEmail(request.getEmail()).orElse(null);
 
-        if (user == null) {
-            log.warn("  ✗ No user found for: {}", request.getEmail());
+        if (user == null || !passwordEncoder.matches(request.getPassword(), user.getPassword())) {
+            log.warn("  ✗ Invalid credentials for: {}", request.getEmail());
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
-                    .body(new AuthResponse(null, null, "Invalid email or password"));
+                    .body(Map.of("error", "Invalid email or password"));
         }
 
-        if (!passwordEncoder.matches(request.getPassword(), user.getPassword())) {
-            log.warn("  ✗ Wrong password for: {}", request.getEmail());
-            return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
-                    .body(new AuthResponse(null, null, "Invalid email or password"));
-        }
-
-        // Block login if email not verified
         if (user.getStatus() == User.UserStatus.PENDING) {
-            log.warn("  ✗ Email not verified for: {}", request.getEmail());
+            log.warn("  ✗ Email not verified: {}", request.getEmail());
             return ResponseEntity.status(HttpStatus.FORBIDDEN)
-                    .body(new AuthResponse(null, null,
-                            "Please verify your email before logging in. Check your inbox for the verification link."));
+                    .body(Map.of(
+                        "error", "Please verify your email before logging in. Check your inbox for the verification link.",
+                        "needsVerification", true,
+                        "email", request.getEmail()
+                    ));
         }
 
         if (user.getStatus() == User.UserStatus.INACTIVE) {
-            log.warn("  ✗ Account inactive for: {}", request.getEmail());
             return ResponseEntity.status(HttpStatus.FORBIDDEN)
-                    .body(new AuthResponse(null, null, "Your account has been deactivated. Please contact support."));
+                    .body(Map.of("error", "Your account has been deactivated. Please contact support."));
         }
 
-        String token = jwtService.generateToken(user);
-        log.info("  ✓ Login successful for: {}", request.getEmail());
-        return ResponseEntity.ok(new AuthResponse(token, toUserDto(user), null));
+        // Password correct + email verified → send OTP
+        try {
+            otpService.sendOtp(user);
+            log.info("  ✓ OTP sent to: {}", user.getEmail());
+            return ResponseEntity.ok(Map.of(
+                    "otpRequired", true,
+                    "email", user.getEmail(),
+                    "message", "A 6-digit code has been sent to " + user.getEmail() + ". Enter it below to complete login."
+            ));
+        } catch (RuntimeException e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(Map.of("error", e.getMessage()));
+        }
     }
+
+    // ─── Step 2b: Verify OTP → issue JWT ─────────────────────────────────────
+
+    @PostMapping("/verify-otp")
+    public ResponseEntity<?> verifyOtp(@RequestBody Map<String, String> req) {
+        String email = req.get("email");
+        String code  = req.get("code");
+        log.info("━━━ LOGIN STEP 2 (OTP) ━━━ email={} code={}",
+                email, code != null ? "****" + code.substring(Math.max(0, code.length()-2)) : "null");
+
+        if (email == null || code == null) {
+            return ResponseEntity.badRequest().body(Map.of("error", "Email and code are required"));
+        }
+
+        try {
+            User user = otpService.verifyOtp(email, code, userRepository);
+            String token = jwtService.generateToken(user);
+            log.info("  ✓ OTP verified — login complete for: {}", email);
+
+            AuthResponse res = new AuthResponse(token, toUserDto(user), null);
+            return ResponseEntity.ok(res);
+        } catch (IllegalArgumentException e) {
+            log.warn("  ✗ OTP verification failed for {}: {}", email, e.getMessage());
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                    .body(Map.of("error", e.getMessage()));
+        }
+    }
+
+    // ─── Email Verification ───────────────────────────────────────────────────
 
     @GetMapping("/verify")
     public ResponseEntity<Map<String, String>> verifyEmail(@RequestParam String token) {
-        log.info("━━━ VERIFY EMAIL ━━━ token={}...", token.substring(0, 8));
+        log.info("━━━ VERIFY EMAIL ━━━");
         try {
             User user = emailVerificationService.verifyToken(token);
-            // Send welcome email after verification
             notificationService.sendWelcome(user.getTenant(), user.getFullName());
-            log.info("  ✓ Account verified for: {}", user.getEmail());
             return ResponseEntity.ok(Map.of(
-                    "message", "Email verified successfully! Your account is now active.",
+                    "message", "Email verified! Your account is now active. You can now log in.",
                     "email", user.getEmail()
             ));
         } catch (IllegalArgumentException e) {
-            log.warn("  ✗ Verification failed: {}", e.getMessage());
-            return ResponseEntity.badRequest()
-                    .body(Map.of("error", e.getMessage()));
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
         }
     }
 
     @PostMapping("/resend-verification")
     public ResponseEntity<Map<String, String>> resendVerification(@RequestBody Map<String, String> req) {
-        String email = req.get("email");
-        log.info("━━━ RESEND VERIFICATION ━━━ email={}", email);
         try {
-            emailVerificationService.resendVerificationEmail(email);
-            return ResponseEntity.ok(Map.of(
-                    "message", "Verification email resent. Please check your inbox."
-            ));
+            emailVerificationService.resendVerificationEmail(req.get("email"));
+            return ResponseEntity.ok(Map.of("message", "Verification email resent. Please check your inbox."));
         } catch (IllegalArgumentException e) {
             return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
         }
@@ -163,13 +182,9 @@ public class AuthController {
 
     private UserDto toUserDto(User user) {
         return new UserDto(
-                user.getId(),
-                user.getEmail(),
-                user.getFullName(),
-                user.getRole().name(),
-                user.getTenant().getId(),
-                user.getTenant().getName(),
-                user.getTenant().getSlug(),
+                user.getId(), user.getEmail(), user.getFullName(),
+                user.getRole().name(), user.getTenant().getId(),
+                user.getTenant().getName(), user.getTenant().getSlug(),
                 user.getTenant().getPlan().name()
         );
     }
