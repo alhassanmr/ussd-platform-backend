@@ -95,6 +95,12 @@ public class UssdAppController {
                     if (request.getWebhookMethod() != null && (request.getWebhookMethod().equalsIgnoreCase("POST") || request.getWebhookMethod().equalsIgnoreCase("GET"))) {
                         app.setWebhookMethod(request.getWebhookMethod().toUpperCase());
                     }
+                    if (request.getRequestFormat() != null) {
+                        String fmt = request.getRequestFormat().toUpperCase();
+                        if (fmt.equals("JSON") || fmt.equals("FORM") || fmt.equals("XML")) {
+                            app.setRequestFormat(fmt);
+                        }
+                    }
                     return ResponseEntity.ok(toDto(appRepository.save(app)));
                 })
                 .orElse(ResponseEntity.notFound().build());
