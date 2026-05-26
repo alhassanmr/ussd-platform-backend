@@ -162,8 +162,12 @@ public class MenuController {
                     if (request.getEndMessage() != null) item.setEndMessage(request.getEndMessage());
                     if (request.getDisplayOrder() != null) item.setDisplayOrder(request.getDisplayOrder());
                     if (request.getNextMenuId() != null) {
-                        menuRepository.findById(request.getNextMenuId())
-                                .ifPresent(item::setNextMenu);
+                        if (request.getNextMenuId().toString().equals("clear")) {
+                            item.setNextMenu(null);
+                        } else {
+                            menuRepository.findById(request.getNextMenuId())
+                                    .ifPresent(item::setNextMenu);
+                        }
                     }
                     return ResponseEntity.ok(toItemDto(menuItemRepository.save(item)));
                 })
@@ -216,39 +220,6 @@ public class MenuController {
             });
         }
         return ResponseEntity.ok().build();
-    }
-
-    // ─── Update item (for linking + editing) ─────────────────────────────────
-
-    @PutMapping("/{menuId}/items/{itemId}")
-    public ResponseEntity<?> updateItem(
-            @AuthenticationPrincipal User user,
-            @PathVariable UUID appId,
-            @PathVariable UUID menuId,
-            @PathVariable UUID itemId,
-            @RequestBody java.util.Map<String, Object> req) {
-
-        if (!appRepository.existsByIdAndTenantId(appId, user.getTenant().getId()))
-            return ResponseEntity.notFound().build();
-
-        return menuItemRepository.findById(itemId).map(item -> {
-            if (req.containsKey("label"))        item.setLabel(req.get("label").toString());
-            if (req.containsKey("inputPrompt"))   item.setInputPrompt(req.get("inputPrompt").toString());
-            if (req.containsKey("variableName"))  item.setVariableName(req.get("variableName").toString());
-            if (req.containsKey("endMessage"))    item.setEndMessage(req.get("endMessage").toString());
-            if (req.containsKey("webhookUrl"))    item.setWebhookUrl(req.get("webhookUrl").toString());
-            if (req.containsKey("displayOrder"))  item.setDisplayOrder(Integer.parseInt(req.get("displayOrder").toString()));
-            if (req.containsKey("nextMenuId")) {
-                String nextId = req.get("nextMenuId") != null ? req.get("nextMenuId").toString() : null;
-                if (nextId != null && !nextId.isBlank() && !nextId.equals("null")) {
-                    menuRepository.findById(UUID.fromString(nextId)).ifPresent(item::setNextMenu);
-                } else {
-                    item.setNextMenu(null);
-                }
-            }
-            menuItemRepository.save(item);
-            return ResponseEntity.ok(toItemDto(item));
-        }).orElse(ResponseEntity.notFound().build());
     }
 
 
