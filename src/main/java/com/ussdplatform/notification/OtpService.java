@@ -85,7 +85,7 @@ public class OtpService {
                 .orElseThrow(() -> new IllegalArgumentException("No active OTP found. Please login again to get a new code."));
 
         if (otp.isMaxAttemptsReached()) {
-            throw new IllegalArgumentException("Too many incorrect attempts. Please login again to get a new code.");
+            throw new IllegalArgumentException("Too many incorrect attempts. Click Resend below to get a new code.");
         }
 
         if (otp.isExpired()) {
@@ -105,7 +105,7 @@ public class OtpService {
             throw new IllegalArgumentException(
                 remaining > 0
                     ? "Incorrect code. " + remaining + " attempt" + (remaining == 1 ? "" : "s") + " remaining."
-                    : "Too many incorrect attempts. Please login again."
+                    : "Too many incorrect attempts. Click Resend to get a new code."
             );
         }
 
