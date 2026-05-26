@@ -52,7 +52,12 @@ server:
 
 jwt:
   secret: ${JWT_SECRET:ussd-platform-default-dev-secret-key-change-in-production}
-  expiration: 86400000
+  # Token expiry in milliseconds:
+  # 3600000   =  1 hour
+  # 28800000  =  8 hours
+  # 86400000  = 24 hours (default)
+  # 604800000 =  7 days
+  expiration: ${JWT_EXPIRATION:86400000}
 
 ussd:
   session:
