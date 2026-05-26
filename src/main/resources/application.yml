@@ -75,6 +75,9 @@ ussd:
     rancard:
       api-key: ${RANCARD_API_KEY:}
       base-url: https://ussd.rancard.com/api
+    nalo:
+      api-key: ${NALO_API_KEY:}
+      base-url: https://nalosolutions.com/ussd
 
 mailjet:
   api-key-public: ${MAILJET_API_KEY_PUBLIC:9014a70c148a2a8e6fe74ee3d44d2cb7}
