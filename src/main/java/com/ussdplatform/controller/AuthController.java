@@ -147,7 +147,7 @@ public class AuthController {
             return ResponseEntity.ok(Map.of(
                     "otpRequired", true,
                     "email", user.getEmail(),
-                    "message", "A 6-digit code has been sent to " + user.getEmail() + ". Enter it below to complete login."
+                    "message", "A 6-digit code has been sent to " + user.getEmail()
             ));
         } catch (RuntimeException e) {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
