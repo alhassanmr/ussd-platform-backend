@@ -48,6 +48,7 @@ public class SecurityConfig {
                 .requestMatchers("/ussd/webhook/**").permitAll()
                 .requestMatchers("/api/auth/register", "/api/auth/login", "/api/auth/verify", "/api/auth/verify-otp", "/api/auth/resend-verification").permitAll()
                 .requestMatchers("/api/admin/login", "/api/admin/setup").permitAll()
+                .requestMatchers("/api/team/invite/validate", "/api/team/invite/accept").permitAll()
                 .requestMatchers("/api/billing/paystack/webhook").permitAll()
                 .anyRequest().authenticated()
             )

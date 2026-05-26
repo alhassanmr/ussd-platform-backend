@@ -28,6 +28,9 @@ public class User {
     @Column(name = "full_name", nullable = false)
     private String fullName;
 
+    @Column
+    private String phone;
+
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
     @Builder.Default
