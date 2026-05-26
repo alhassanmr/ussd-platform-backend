@@ -189,4 +189,62 @@ public class AdminController {
                 })
                 .collect(Collectors.toList());
     }
+    // ─── Admin User Management ────────────────────────────────────────────────
+
+    @GetMapping("/users")
+    public List<Map<String, Object>> listAdmins() {
+        return adminUserRepo.findAll().stream()
+                .map(a -> {
+                    Map<String, Object> m = new LinkedHashMap<>();
+                    m.put("id", a.getId());
+                    m.put("email", a.getEmail());
+                    m.put("fullName", a.getFullName());
+                    m.put("isActive", a.isActive());
+                    m.put("createdAt", a.getCreatedAt());
+                    return m;
+                })
+                .collect(Collectors.toList());
+    }
+
+    @PostMapping("/users")
+    public ResponseEntity<Map<String, Object>> createAdmin(@RequestBody Map<String, String> req) {
+        if (adminUserRepo.existsByEmail(req.get("email"))) {
+            Map<String, Object> err = new LinkedHashMap<>();
+            err.put("error", "Email already exists");
+            return ResponseEntity.badRequest().body(err);
+        }
+        AdminUser admin = AdminUser.builder()
+                .email(req.get("email"))
+                .password(passwordEncoder.encode(req.get("password")))
+                .fullName(req.get("fullName"))
+                .isActive(true)
+                .build();
+        adminUserRepo.save(admin);
+        Map<String, Object> res = new LinkedHashMap<>();
+        res.put("id", admin.getId());
+        res.put("email", admin.getEmail());
+        res.put("message", "Admin user created");
+        return ResponseEntity.ok(res);
+    }
+
+    @PutMapping("/users/{id}/status")
+    public ResponseEntity<Map<String, Object>> toggleAdminStatus(@PathVariable UUID id) {
+        return adminUserRepo.findById(id).map(admin -> {
+            admin.setActive(!admin.isActive());
+            adminUserRepo.save(admin);
+            Map<String, Object> res = new LinkedHashMap<>();
+            res.put("id", admin.getId());
+            res.put("isActive", admin.isActive());
+            return ResponseEntity.ok(res);
+        }).orElse(ResponseEntity.notFound().build());
+    }
+
+    @DeleteMapping("/users/{id}")
+    public ResponseEntity<?> deleteAdmin(@PathVariable UUID id) {
+        if (adminUserRepo.count() <= 1) {
+            return ResponseEntity.badRequest().body(Map.of("error", "Cannot delete the last admin"));
+        }
+        adminUserRepo.deleteById(id);
+        return ResponseEntity.noContent().build();
+    }
 }

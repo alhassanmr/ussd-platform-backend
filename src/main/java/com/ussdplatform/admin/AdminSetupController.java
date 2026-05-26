@@ -13,14 +13,8 @@ import java.util.Map;
 
 /**
  * One-time endpoint to seed the first admin account.
- *
- * Protected by a setup secret defined in application.yml.
- * Once an admin exists, this endpoint returns 403.
- *
- * Usage:
- *   POST /api/admin/setup
- *   Header: X-Setup-Secret: your_setup_secret
- *   Body: { "email": "you@example.com", "password": "strong_password", "fullName": "Your Name" }
+ * Automatically locks itself after first admin is created.
+ * Can also be fully disabled via ADMIN_SETUP_ENABLED=false
  */
 @RestController
 @RequestMapping("/api/admin/setup")
@@ -34,26 +28,33 @@ public class AdminSetupController {
     @Value("${admin.setup-secret:CHANGE_ME_BEFORE_DEPLOY}")
     private String setupSecret;
 
+    @Value("${admin.setup-enabled:true}")
+    private boolean setupEnabled;
+
     @PostMapping
     public ResponseEntity<Map<String, String>> setup(
             @RequestHeader("X-Setup-Secret") String secret,
             @RequestBody Map<String, String> req) {
 
-        // Only allow if no admins exist yet
-        if (adminUserRepo.count() > 0) {
-            log.warn("Admin setup attempted but admin already exists");
-            return ResponseEntity.status(403)
-                    .body(Map.of("error", "Admin already configured. Use the login endpoint."));
+        // Disabled via config
+        if (!setupEnabled) {
+            log.warn("Admin setup attempted but endpoint is disabled");
+            return ResponseEntity.status(404).body(Map.of("error", "Not found"));
         }
 
-        // Verify setup secret
+        // Locked after first admin exists
+        if (adminUserRepo.count() > 0) {
+            log.warn("Admin setup attempted but admin already exists — endpoint locked");
+            return ResponseEntity.status(403)
+                    .body(Map.of("error", "Admin already configured. Use /api/admin/users to manage admins."));
+        }
+
         if (!setupSecret.equals(secret)) {
             log.warn("Admin setup attempted with wrong secret");
-            return ResponseEntity.status(401)
-                    .body(Map.of("error", "Invalid setup secret"));
+            return ResponseEntity.status(401).body(Map.of("error", "Invalid setup secret"));
         }
 
-        String email = req.get("email");
+        String email    = req.get("email");
         String password = req.get("password");
         String fullName = req.get("fullName");
 
@@ -61,7 +62,6 @@ public class AdminSetupController {
             return ResponseEntity.badRequest()
                     .body(Map.of("error", "email, password, and fullName are required"));
         }
-
         if (password.length() < 8) {
             return ResponseEntity.badRequest()
                     .body(Map.of("error", "Password must be at least 8 characters"));
@@ -73,12 +73,11 @@ public class AdminSetupController {
                 .fullName(fullName)
                 .isActive(true)
                 .build();
-
         adminUserRepo.save(admin);
-        log.info("First admin account created for: {}", email);
+        log.info("First admin account created: {}", email);
 
         return ResponseEntity.ok(Map.of(
-                "message", "Admin account created successfully. You can now log in at /admin",
+                "message", "Admin created. Endpoint now locked — add ADMIN_SETUP_ENABLED=false to your env to fully disable it.",
                 "email", email
         ));
     }
