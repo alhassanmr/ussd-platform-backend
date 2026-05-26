@@ -7,5 +7,6 @@ public class UpdateAppRequest {
     public String description;
     public String shortCode;
     public String status;
+    public String gatewayType;
     public Map<String, String> gatewayConfig;
 }

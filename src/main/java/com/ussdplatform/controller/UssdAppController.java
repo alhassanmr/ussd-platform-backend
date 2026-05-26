@@ -88,6 +88,10 @@ public class UssdAppController {
                     if (request.getShortCode() != null) app.setShortCode(request.getShortCode());
                     if (request.getGatewayConfig() != null) app.setGatewayConfig(request.getGatewayConfig());
                     if (request.getStatus() != null) app.setStatus(UssdApp.AppStatus.valueOf(request.getStatus()));
+                    if (request.getGatewayType() != null) {
+                        try { app.setGatewayType(UssdApp.GatewayType.valueOf(request.getGatewayType())); }
+                        catch (IllegalArgumentException e) { /* ignore invalid gateway type */ }
+                    }
                     return ResponseEntity.ok(toDto(appRepository.save(app)));
                 })
                 .orElse(ResponseEntity.notFound().build());
