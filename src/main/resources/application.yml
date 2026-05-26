@@ -78,6 +78,15 @@ ussd:
     nalo:
       api-key: ${NALO_API_KEY:}
       base-url: https://nalosolutions.com/ussd
+    mtn-ghana:
+      api-key: ${MTN_GHANA_API_KEY:}
+      base-url: ${MTN_GHANA_BASE_URL:https://api.mtn.com.gh/ussd}
+    telecel-ghana:
+      api-key: ${TELECEL_GHANA_API_KEY:}
+      base-url: ${TELECEL_GHANA_BASE_URL:https://api.telecel.com.gh/ussd}
+    airteltigo-ghana:
+      api-key: ${AIRTELTIGO_API_KEY:}
+      base-url: ${AIRTELTIGO_BASE_URL:https://api.airteltigo.com.gh/ussd}
 
 mailjet:
   api-key-public: ${MAILJET_API_KEY_PUBLIC:9014a70c148a2a8e6fe74ee3d44d2cb7}
