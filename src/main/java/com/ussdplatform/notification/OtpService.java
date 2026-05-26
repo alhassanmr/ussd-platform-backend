@@ -39,8 +39,20 @@ public class OtpService {
      * Generate OTP, save it, and send to user's email.
      * Called after successful password check.
      */
+    // Simple in-memory rate limiter: max 3 OTP requests per 15 mins per user
+    private final java.util.concurrent.ConcurrentHashMap<java.util.UUID, java.util.List<java.time.LocalDateTime>> otpRateMap = new java.util.concurrent.ConcurrentHashMap<>();
+
     @Transactional
     public void sendOtp(User user) {
+        // Rate limit check
+        java.util.List<java.time.LocalDateTime> timestamps = otpRateMap.computeIfAbsent(user.getId(), k -> new java.util.ArrayList<>());
+        java.time.LocalDateTime cutoff = java.time.LocalDateTime.now().minusMinutes(15);
+        timestamps.removeIf(t -> t.isBefore(cutoff));
+        if (timestamps.size() >= 3) {
+            throw new RuntimeException("Too many OTP requests. Please wait 15 minutes before trying again.");
+        }
+        timestamps.add(java.time.LocalDateTime.now());
+
         // Delete any existing OTPs for this user
         otpRepo.deleteByUserId(user.getId());
 

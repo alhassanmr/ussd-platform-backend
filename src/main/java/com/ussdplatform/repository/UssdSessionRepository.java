@@ -12,7 +12,7 @@ public interface UssdSessionRepository extends JpaRepository<UssdSession, UUID> 
     @Query("SELECT COUNT(s) FROM UssdSession s WHERE s.app.id = :appId AND s.status = 'ACTIVE'")
     long countActiveSessions(UUID appId);
 
-    @Query("SELECT COUNT(s) FROM UssdSession s WHERE s.app.tenant.id = :tenantId")
+    @Query("SELECT COUNT(s) FROM UssdSession s WHERE s.app.tenant.id = :tenantId AND s.sessionId NOT LIKE 'SIM-%'")
     long countByTenantId(UUID tenantId);
 
     @Query("SELECT COUNT(s) FROM UssdSession s WHERE s.app.tenant.id = :tenantId AND s.status = 'ACTIVE'")
@@ -21,7 +21,7 @@ public interface UssdSessionRepository extends JpaRepository<UssdSession, UUID> 
     @Query("SELECT COUNT(s) FROM UssdSession s WHERE s.app.id = :appId")
     long countByAppId(UUID appId);
 
-    @Query("SELECT COUNT(s) FROM UssdSession s WHERE s.app.tenant.id = :tenantId AND s.startedAt BETWEEN :from AND :to")
+    @Query("SELECT COUNT(s) FROM UssdSession s WHERE s.app.tenant.id = :tenantId AND s.sessionId NOT LIKE 'SIM-%' AND s.startedAt BETWEEN :from AND :to")
     long countByTenantIdAndDate(UUID tenantId, java.time.LocalDateTime from, java.time.LocalDateTime to);
 
     @Query("SELECT COUNT(s) FROM UssdSession s WHERE s.app.tenant.id = :tenantId AND s.status = :status")

@@ -3,9 +3,15 @@ package com.ussdplatform.controller;
 import com.ussdplatform.dto.*;
 import com.ussdplatform.model.Tenant;
 import com.ussdplatform.model.User;
+import com.ussdplatform.billing.UsageTrackingService;
+import com.ussdplatform.model.Plan;
+import com.ussdplatform.model.Subscription;
 import com.ussdplatform.notification.EmailVerificationService;
+import com.ussdplatform.repository.PlanRepository;
+import com.ussdplatform.repository.SubscriptionRepository;
 import com.ussdplatform.notification.NotificationService;
 import com.ussdplatform.notification.OtpService;
+import com.ussdplatform.notification.PasswordResetService;
 import com.ussdplatform.repository.TenantRepository;
 import com.ussdplatform.repository.UserRepository;
 import com.ussdplatform.security.JwtService;
@@ -33,6 +39,9 @@ public class AuthController {
     private final NotificationService notificationService;
     private final EmailVerificationService emailVerificationService;
     private final OtpService otpService;
+    private final PlanRepository planRepository;
+    private final PasswordResetService passwordResetService;
+    private final SubscriptionRepository subscriptionRepository;
 
     // ─── Step 1: Register ─────────────────────────────────────────────────────
 
@@ -68,6 +77,17 @@ public class AuthController {
                 .status(User.UserStatus.PENDING)  // must verify email
                 .build();
         userRepository.save(user);
+
+        // Auto-create FREE subscription for new tenant
+        planRepository.findByName("FREE").ifPresent(freePlan -> {
+            Subscription sub = Subscription.builder()
+                    .tenant(tenant)
+                    .plan(freePlan)
+                    .status(Subscription.SubscriptionStatus.TRIAL)
+                    .build();
+            subscriptionRepository.save(sub);
+            log.info("  ✓ FREE subscription created for tenant: {}", tenant.getId());
+        });
 
         emailVerificationService.sendVerificationEmail(user);
         log.info("  ✓ Registered {} — verification email sent", request.getEmail());
@@ -192,6 +212,74 @@ public class AuthController {
     public ResponseEntity<UserDto> me(@AuthenticationPrincipal User user) {
         if (user == null) return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
         return ResponseEntity.ok(toUserDto(user));
+    }
+
+    // ─── Forgot password ─────────────────────────────────────────────────────
+
+    @PostMapping("/forgot-password")
+    public ResponseEntity<Map<String, String>> forgotPassword(@RequestBody Map<String, String> req) {
+        String email = req.get("email");
+        if (email == null || email.isBlank()) {
+            return ResponseEntity.badRequest().body(Map.of("error", "Email is required"));
+        }
+        // Always return success to not reveal if email exists
+        passwordResetService.sendResetEmail(email);
+        return ResponseEntity.ok(Map.of("message",
+                "If an account exists for " + email + ", a reset link has been sent."));
+    }
+
+    @PostMapping("/reset-password")
+    public ResponseEntity<Map<String, String>> resetPassword(@RequestBody Map<String, String> req) {
+        try {
+            passwordResetService.resetPassword(req.get("token"), req.get("password"));
+            return ResponseEntity.ok(Map.of("message", "Password reset successfully. You can now log in."));
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+        }
+    }
+
+    // ─── Profile update ───────────────────────────────────────────────────────
+
+    @PutMapping("/profile")
+    public ResponseEntity<Map<String, Object>> updateProfile(
+            @AuthenticationPrincipal User user,
+            @RequestBody Map<String, String> req) {
+
+        if (req.containsKey("fullName") && !req.get("fullName").isBlank()) {
+            user.setFullName(req.get("fullName"));
+        }
+        if (req.containsKey("phone")) {
+            user.setPhone(req.get("phone"));
+        }
+        userRepository.save(user);
+        log.info("Profile updated for: {}", user.getEmail());
+
+        Map<String, Object> res = new LinkedHashMap<>();
+        res.put("id", user.getId());
+        res.put("fullName", user.getFullName());
+        res.put("email", user.getEmail());
+        res.put("phone", user.getPhone());
+        return ResponseEntity.ok(res);
+    }
+
+    @PutMapping("/change-password")
+    public ResponseEntity<Map<String, String>> changePassword(
+            @AuthenticationPrincipal User user,
+            @RequestBody Map<String, String> req) {
+
+        String current = req.get("currentPassword");
+        String newPass  = req.get("newPassword");
+
+        if (!passwordEncoder.matches(current, user.getPassword())) {
+            return ResponseEntity.badRequest().body(Map.of("error", "Current password is incorrect"));
+        }
+        if (newPass == null || newPass.length() < 6) {
+            return ResponseEntity.badRequest().body(Map.of("error", "New password must be at least 6 characters"));
+        }
+        user.setPassword(passwordEncoder.encode(newPass));
+        userRepository.save(user);
+        log.info("Password changed for: {}", user.getEmail());
+        return ResponseEntity.ok(Map.of("message", "Password changed successfully"));
     }
 
     private UserDto toUserDto(User user) {

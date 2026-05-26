@@ -1,5 +1,6 @@
 package com.ussdplatform.engine;
 
+import com.ussdplatform.billing.UsageTrackingService;
 import com.ussdplatform.gateway.UssdRequest;
 import com.ussdplatform.gateway.UssdResponse;
 import com.ussdplatform.model.*;
@@ -25,6 +26,7 @@ public class UssdEngine {
     private final MenuRepository menuRepository;
     private final SessionCache sessionCache;
     private final WebClient.Builder webClientBuilder;
+    private final UsageTrackingService usageTrackingService;
 
     @Transactional
     public UssdResponse process(UssdApp app, UssdRequest request) {

@@ -34,6 +34,7 @@ public class SimulatorController {
                 .orElse(null);
         if (app == null) return ResponseEntity.notFound().build();
 
+        // SIM- prefix marks this as a simulator session, excluded from analytics
         String sessionId = "SIM-" + appId + "-" + req.getOrDefault("sessionId", UUID.randomUUID().toString());
         String input     = req.getOrDefault("input", "");
         boolean isNew    = "true".equals(req.get("isNew")) || input.isEmpty();

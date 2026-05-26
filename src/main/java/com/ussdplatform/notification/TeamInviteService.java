@@ -104,6 +104,31 @@ public class TeamInviteService {
     public void markAccepted(TeamInvite invite) {
         invite.setAcceptedAt(LocalDateTime.now());
         inviteRepo.save(invite);
+        // Notify the person who sent the invite
+        notifyOwnerOfAcceptance(invite);
+    }
+
+    @Async
+    protected void notifyOwnerOfAcceptance(TeamInvite invite) {
+        try {
+            MimeMessage message = mailSender.createMimeMessage();
+            MimeMessageHelper helper = new MimeMessageHelper(message, true, "UTF-8");
+            helper.setFrom(new InternetAddress(fromEmail, fromName));
+            helper.setTo(invite.getInvitedBy().getEmail());
+            helper.setSubject(invite.getEmail() + " joined " + invite.getTenant().getName());
+            helper.setText(String.format("""
+                <!DOCTYPE html><html><body style="font-family:system-ui,sans-serif;max-width:600px;margin:0 auto;padding:40px 24px">
+                <h2>New team member joined 🎉</h2>
+                <p><strong>%s</strong> has accepted your invitation and joined <strong>%s</strong> as <strong>%s</strong>.</p>
+                <a href="%s/team" style="display:inline-block;margin-top:20px;background:#111;color:#fff;padding:12px 24px;border-radius:8px;text-decoration:none">
+                  View team →
+                </a>
+                </body></html>
+                """, invite.getEmail(), invite.getTenant().getName(), invite.getRole().name(), appBaseUrl), true);
+            mailSender.send(message);
+        } catch (Exception e) {
+            log.warn("Could not notify owner of team acceptance: {}", e.getMessage());
+        }
     }
 
     private String buildInviteEmail(String inviterName, String company, String role, String inviteUrl) {

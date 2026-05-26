@@ -1,5 +1,6 @@
 package com.ussdplatform.controller;
 
+import com.ussdplatform.billing.UsageTrackingService;
 import com.ussdplatform.engine.UssdEngine;
 import com.ussdplatform.gateway.GatewayFactory;
 import com.ussdplatform.gateway.UssdGateway;
@@ -32,6 +33,7 @@ public class UssdWebhookController {
     private final UssdEngine engine;
     private final GatewayFactory gatewayFactory;
     private final UssdAppRepository appRepository;
+    private final UsageTrackingService usageTrackingService;
 
     /**
      * Africa's Talking sends form-encoded POST.
@@ -72,6 +74,8 @@ public class UssdWebhookController {
         }
 
         UssdResponse response = engine.process(app, request);
+        // Track usage asynchronously
+        try { usageTrackingService.recordSession(app.getTenant(), app); } catch (Exception e) { log.warn("Usage tracking failed: {}", e.getMessage()); }
         String formatted = gateway.formatResponse(response);
         log.debug("USSD response for session {}: {}", request.getSessionId(), formatted);
 
