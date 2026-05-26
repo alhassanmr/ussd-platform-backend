@@ -142,12 +142,26 @@ public class AuthController {
 
         // Password correct + email verified → send OTP
         try {
-            otpService.sendOtp(user);
-            log.info("  ✓ OTP sent to: {}", user.getEmail());
+            otpService.sendOtp(user); // always sends to email
+
+            // Also attempt SMS if user has a phone number (no-op until SMS is configured)
+            if (user.getPhone() != null && !user.getPhone().isBlank()) {
+                otpService.sendOtpViaSms(user.getPhone(), ""); // code is fetched inside when SMS is wired
+            }
+
+            boolean loginWithPhone = identifier != null && identifier.startsWith("+");
+            String message = loginWithPhone
+                    ? "A 6-digit code has been sent to your email (" + user.getEmail() + ")"
+                    : "A 6-digit code has been sent to " + user.getEmail();
+
+            log.info("  ✓ OTP sent via email to: {} (login method: {})",
+                    user.getEmail(), loginWithPhone ? "phone" : "email");
+
             return ResponseEntity.ok(Map.of(
                     "otpRequired", true,
                     "email", user.getEmail(),
-                    "message", "A 6-digit code has been sent to " + user.getEmail()
+                    "loginMethod", loginWithPhone ? "phone" : "email",
+                    "message", message
             ));
         } catch (RuntimeException e) {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)

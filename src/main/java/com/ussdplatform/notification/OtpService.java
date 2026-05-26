@@ -129,6 +129,18 @@ public class OtpService {
         return user;
     }
 
+    /**
+     * SMS delivery — placeholder for future SMS integration.
+     * Add your SMS provider (Arkesel, Hubtel SMS, etc.) here.
+     * Called after sendOtp() so the code is already saved in DB.
+     */
+    public void sendOtpViaSms(String phone, String code) {
+        // TODO: integrate SMS provider
+        // Example with Arkesel:
+        // arkeselClient.sendSms(phone, "Your USSD Platform code: " + code + ". Expires in 10 minutes.");
+        log.info("SMS OTP not yet configured — code for {} sent via email only", phone);
+    }
+
     private String buildOtpEmail(String name, String code) {
         return String.format("""
             <!DOCTYPE html>
