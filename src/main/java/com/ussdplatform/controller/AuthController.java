@@ -3,9 +3,10 @@ package com.ussdplatform.controller;
 import com.ussdplatform.dto.*;
 import com.ussdplatform.model.Tenant;
 import com.ussdplatform.model.User;
+import com.ussdplatform.notification.EmailVerificationService;
+import com.ussdplatform.notification.NotificationService;
 import com.ussdplatform.repository.TenantRepository;
 import com.ussdplatform.repository.UserRepository;
-import com.ussdplatform.notification.NotificationService;
 import com.ussdplatform.security.JwtService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -15,6 +16,8 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.web.bind.annotation.*;
+
+import java.util.Map;
 
 @RestController
 @RequestMapping("/api/auth")
@@ -27,13 +30,11 @@ public class AuthController {
     private final PasswordEncoder passwordEncoder;
     private final JwtService jwtService;
     private final NotificationService notificationService;
+    private final EmailVerificationService emailVerificationService;
 
     @PostMapping("/register")
     public ResponseEntity<AuthResponse> register(@Valid @RequestBody RegisterRequest request) {
-        log.info("━━━ REGISTER ━━━");
-        log.info("  Email      : {}", request.getEmail());
-        log.info("  Full name  : {}", request.getFullName());
-        log.info("  Company    : {}", request.getCompanyName());
+        log.info("━━━ REGISTER ━━━ email={}", request.getEmail());
 
         if (userRepository.existsByEmail(request.getEmail())) {
             log.warn("  ✗ Email already registered: {}", request.getEmail());
@@ -41,6 +42,7 @@ public class AuthController {
                     .body(new AuthResponse(null, null, "Email already registered"));
         }
 
+        // Create tenant
         String slug = request.getCompanyName().toLowerCase()
                 .replaceAll("[^a-z0-9]", "-")
                 .replaceAll("-+", "-");
@@ -49,7 +51,6 @@ public class AuthController {
         while (tenantRepository.existsBySlug(finalSlug)) {
             finalSlug = slug + "-" + (++attempt);
         }
-        log.info("  Slug       : {}", finalSlug);
 
         Tenant tenant = Tenant.builder()
                 .name(request.getCompanyName())
@@ -60,70 +61,102 @@ public class AuthController {
                 .plan(Tenant.Plan.FREE)
                 .build();
         tenantRepository.save(tenant);
-        log.info("  ✓ Tenant created: id={}", tenant.getId());
+        log.info("  ✓ Tenant created: {} ({})", tenant.getName(), tenant.getId());
 
+        // Create user with PENDING status — must verify email first
         User user = User.builder()
                 .tenant(tenant)
                 .email(request.getEmail())
                 .password(passwordEncoder.encode(request.getPassword()))
                 .fullName(request.getFullName())
                 .role(User.Role.OWNER)
-                .status(User.UserStatus.ACTIVE)
+                .status(User.UserStatus.PENDING)
                 .build();
         userRepository.save(user);
-        log.info("  ✓ User created: id={} status={}", user.getId(), user.getStatus());
+        log.info("  ✓ User created: {} (status=PENDING)", user.getId());
 
-        String token = jwtService.generateToken(user);
-        // Send welcome email (async - won't block response)
-        notificationService.sendWelcome(tenant, request.getFullName());
-        log.info("  ✓ Welcome email queued for: {}", request.getEmail());
-        log.info("  ✓ Token generated, returning 201");
+        // Send verification email (async)
+        emailVerificationService.sendVerificationEmail(user);
+        log.info("  ✓ Verification email queued for: {}", request.getEmail());
+
+        // Return 201 but no token — user must verify first
         return ResponseEntity.status(HttpStatus.CREATED)
-                .body(new AuthResponse(token, toUserDto(user), null));
+                .body(new AuthResponse(null, null,
+                        "Account created! Please check your email (" + request.getEmail() + ") and click the verification link to activate your account."));
     }
 
     @PostMapping("/login")
     public ResponseEntity<AuthResponse> login(@Valid @RequestBody LoginRequest request) {
-        log.info("━━━ LOGIN ━━━");
-        log.info("  Email: {}", request.getEmail());
-        log.info("  Password provided: {}", request.getPassword() != null && !request.getPassword().isEmpty() ? "yes (length=" + request.getPassword().length() + ")" : "NO - empty!");
+        log.info("━━━ LOGIN ━━━ email={}", request.getEmail());
 
         User user = userRepository.findByEmail(request.getEmail()).orElse(null);
 
         if (user == null) {
-            log.warn("  ✗ No user found for email: {}", request.getEmail());
-            log.warn("  Tip: call /api/auth/register first, or check the email spelling");
+            log.warn("  ✗ No user found for: {}", request.getEmail());
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
-                    .body(new AuthResponse(null, null, "Invalid credentials"));
+                    .body(new AuthResponse(null, null, "Invalid email or password"));
         }
 
-        log.info("  ✓ User found: id={} status={} role={}", user.getId(), user.getStatus(), user.getRole());
-        log.info("  Stored password hash: {}...", user.getPassword().substring(0, 20));
-
-        boolean passwordMatches = passwordEncoder.matches(request.getPassword(), user.getPassword());
-        log.info("  Password matches: {}", passwordMatches ? "✓ YES" : "✗ NO");
-
-        if (!passwordMatches) {
+        if (!passwordEncoder.matches(request.getPassword(), user.getPassword())) {
             log.warn("  ✗ Wrong password for: {}", request.getEmail());
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
-                    .body(new AuthResponse(null, null, "Invalid credentials"));
+                    .body(new AuthResponse(null, null, "Invalid email or password"));
         }
 
-        if (user.getStatus() != User.UserStatus.ACTIVE) {
-            log.warn("  ✗ Account not active: {} (status={})", request.getEmail(), user.getStatus());
+        // Block login if email not verified
+        if (user.getStatus() == User.UserStatus.PENDING) {
+            log.warn("  ✗ Email not verified for: {}", request.getEmail());
             return ResponseEntity.status(HttpStatus.FORBIDDEN)
-                    .body(new AuthResponse(null, null, "Account is inactive"));
+                    .body(new AuthResponse(null, null,
+                            "Please verify your email before logging in. Check your inbox for the verification link."));
+        }
+
+        if (user.getStatus() == User.UserStatus.INACTIVE) {
+            log.warn("  ✗ Account inactive for: {}", request.getEmail());
+            return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                    .body(new AuthResponse(null, null, "Your account has been deactivated. Please contact support."));
         }
 
         String token = jwtService.generateToken(user);
         log.info("  ✓ Login successful for: {}", request.getEmail());
-        log.info("  ✓ Token generated, returning 200");
         return ResponseEntity.ok(new AuthResponse(token, toUserDto(user), null));
+    }
+
+    @GetMapping("/verify")
+    public ResponseEntity<Map<String, String>> verifyEmail(@RequestParam String token) {
+        log.info("━━━ VERIFY EMAIL ━━━ token={}...", token.substring(0, 8));
+        try {
+            User user = emailVerificationService.verifyToken(token);
+            // Send welcome email after verification
+            notificationService.sendWelcome(user.getTenant(), user.getFullName());
+            log.info("  ✓ Account verified for: {}", user.getEmail());
+            return ResponseEntity.ok(Map.of(
+                    "message", "Email verified successfully! Your account is now active.",
+                    "email", user.getEmail()
+            ));
+        } catch (IllegalArgumentException e) {
+            log.warn("  ✗ Verification failed: {}", e.getMessage());
+            return ResponseEntity.badRequest()
+                    .body(Map.of("error", e.getMessage()));
+        }
+    }
+
+    @PostMapping("/resend-verification")
+    public ResponseEntity<Map<String, String>> resendVerification(@RequestBody Map<String, String> req) {
+        String email = req.get("email");
+        log.info("━━━ RESEND VERIFICATION ━━━ email={}", email);
+        try {
+            emailVerificationService.resendVerificationEmail(email);
+            return ResponseEntity.ok(Map.of(
+                    "message", "Verification email resent. Please check your inbox."
+            ));
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+        }
     }
 
     @GetMapping("/me")
     public ResponseEntity<UserDto> me(@AuthenticationPrincipal User user) {
-        log.info("━━━ ME ━━━ user={}", user != null ? user.getEmail() : "null (not authenticated)");
         if (user == null) return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
         return ResponseEntity.ok(toUserDto(user));
     }

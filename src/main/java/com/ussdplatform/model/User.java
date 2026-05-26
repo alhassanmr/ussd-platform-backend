@@ -50,5 +50,5 @@ public class User {
     void onUpdate() { this.updatedAt = LocalDateTime.now(); }
 
     public enum Role { OWNER, ADMIN, MEMBER }
-    public enum UserStatus { ACTIVE, INACTIVE }
+    public enum UserStatus { ACTIVE, INACTIVE, PENDING }
 }
