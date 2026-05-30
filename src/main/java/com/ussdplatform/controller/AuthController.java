@@ -16,6 +16,7 @@ import com.ussdplatform.repository.TenantRepository;
 import com.ussdplatform.repository.UserRepository;
 import com.ussdplatform.security.JwtService;
 import jakarta.validation.Valid;
+import org.springframework.transaction.annotation.Transactional;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
@@ -230,6 +231,7 @@ public class AuthController {
     }
 
     @GetMapping("/me")
+    @Transactional(readOnly = true)
     public ResponseEntity<UserDto> me(@AuthenticationPrincipal User user) {
         if (user == null) return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
         return ResponseEntity.ok(toUserDto(user));
