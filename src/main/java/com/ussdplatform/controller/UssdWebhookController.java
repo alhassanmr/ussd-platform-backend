@@ -57,9 +57,19 @@ public class UssdWebhookController {
         UssdApp app = appRepository.findById(appId)
                 .orElse(null);
 
-        if (app == null || app.getStatus() != UssdApp.AppStatus.ACTIVE) {
-            log.warn("App {} not found or not active", appId);
-            return ResponseEntity.ok("END Service unavailable.");
+        if (app == null || app.isDeleted()) {
+            log.warn("App {} not found or has been archived", appId);
+            return ResponseEntity.ok("END This service is no longer available.");
+        }
+
+        if (app.getStatus() == UssdApp.AppStatus.DRAFT) {
+            log.warn("App {} is in DRAFT — not accepting live traffic", appId);
+            return ResponseEntity.ok("END This service is not yet live. Please try again later.");
+        }
+
+        if (app.getStatus() == UssdApp.AppStatus.PAUSED) {
+            log.warn("App {} is PAUSED", appId);
+            return ResponseEntity.ok("END This service is temporarily unavailable. Please try again later.");
         }
 
         UssdGateway gateway = gatewayFactory.getGateway(app.getGatewayType());
