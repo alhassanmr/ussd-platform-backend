@@ -59,6 +59,14 @@ public class UssdApp {
     @Builder.Default
     private LocalDateTime updatedAt = LocalDateTime.now();
 
+    @Column(name = "deleted_at")
+    private LocalDateTime deletedAt;
+
+    @Column(name = "deleted_by")
+    private String deletedBy;
+
+    public boolean isDeleted() { return deletedAt != null; }
+
     @PreUpdate
     void onUpdate() { this.updatedAt = LocalDateTime.now(); }
 

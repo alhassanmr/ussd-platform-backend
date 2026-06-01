@@ -116,8 +116,30 @@ public class UssdAppController {
 
         return appRepository.findByIdAndTenantId(id, user.getTenant().getId())
                 .map(app -> {
-                    appRepository.delete(app);
+                    // Soft delete — preserve all data for audit/recovery
+                    app.setDeletedAt(java.time.LocalDateTime.now());
+                    app.setDeletedBy(user.getEmail());
+                    appRepository.save(app);
                     return ResponseEntity.noContent().build();
+                })
+                .orElse(ResponseEntity.notFound().build());
+    }
+
+    @PostMapping("/{id}/restore")
+    public ResponseEntity<?> restoreApp(
+            @AuthenticationPrincipal User user,
+            @PathVariable UUID id) {
+        if (!RolePermissions.canDeleteApp(user)) {
+            return ResponseEntity.status(403).build();
+        }
+        // Find including soft-deleted
+        return appRepository.findById(id)
+                .filter(app -> app.getTenant().getId().equals(user.getTenant().getId()))
+                .map(app -> {
+                    app.setDeletedAt(null);
+                    app.setDeletedBy(null);
+                    appRepository.save(app);
+                    return ResponseEntity.ok().build();
                 })
                 .orElse(ResponseEntity.notFound().build());
     }
